@@ -1,5 +1,6 @@
 package com.aadeshwagh.ContentWiz;
 
+import com.aadeshwagh.ContentWiz.creation.ScriptGeneratorGemini;
 import com.aadeshwagh.ContentWiz.util.FileServer;
 import com.aadeshwagh.ContentWiz.upload.UploadService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,9 @@ public class ContentWizApplication implements CommandLineRunner {
 	@Autowired
 	UploadService uploadService;
 
+	@Autowired
+	ScriptGeneratorGemini scriptGenerator;
+
 	public static void main(String[] args) {
 
 		SpringApplication.run(ContentWizApplication.class, args);
@@ -24,7 +28,8 @@ public class ContentWizApplication implements CommandLineRunner {
 
 	@Override
 	public void run(String... args) throws Exception {
-		fileServer.getPublicBaseUrl();
-		uploadService.publishAllTypes();
+//		fileServer.getPublicBaseUrl();
+//		uploadService.publishAllTypes();
+		System.out.println(scriptGenerator.generateScript("A poor fisherman finds a mysterious glowing box in the sea. Every night it whispers his name."));
 	}
 }
