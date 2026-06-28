@@ -24,3 +24,6 @@ now for creating a channel what is required
 2. The script
 3. the voice over
 4. the baground music
+
+script is done lets move on to voice over
+
