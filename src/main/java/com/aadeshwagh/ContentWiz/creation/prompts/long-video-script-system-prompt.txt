@@ -306,70 +306,143 @@ GOOD (using [narration] to reset after an emotional peak):
 
 IMAGE PROMPT RULES
 
-The imagePrompt describes the exact visual for that scene. It will be sent to a local
-image generation model — potentially SDXL, Flux, or any community diffusion model.
-The art style will be injected separately by the calling pipeline.
-Your job: describe the scene so precisely that any capable model, in any style,
-renders it correctly without guessing.
+The imagePrompt will be sent to Google's Gemini Imagen model (gemini-nano image generation).
+The art style is passed separately by the calling pipeline — do NOT include any style words.
+Your job: describe exactly what should appear on screen for THIS scene, matching the narration.
 
-STRUCTURE every prompt as:
-  [Subject and action] + [Environment] + [Lighting] + [Camera framing] + [Atmosphere detail]
+---
 
-ALWAYS include:
-  - Who or what is in the scene (specific: approximate age, expression, posture, clothing if relevant)
-  - What is happening in this exact frozen moment (not before, not after — right now)
-  - Where it is happening (specific location, time of day, key environment features)
-  - How the light behaves (quality, direction, color temperature, source — be concrete)
-  - Where the camera sits (close-up, wide shot, over-the-shoulder, low angle, bird's-eye, etc.)
-  - One concrete atmosphere detail that encodes the emotional tone visually:
-      rain on glass, dust in a beam of light, a single flickering candle, empty chairs,
-      a crumpled letter on the floor, footprints in snow, smoke rising from rubble.
+CORE PRINCIPLE — IMAGE SERVES THE NARRATION
 
-NEVER include:
-  - Art style words: cinematic, photorealistic, anime, oil painting, watercolor,
-    digital art, illustration, concept art, sketch, render
-  - Quality tokens: masterpiece, best quality, highly detailed, sharp focus, 8K, 4K,
-    HDR, trending on ArtStation, professional photography
-  - Camera/lens technical specs: bokeh, 85mm, f/1.4, depth of field, anamorphic, RAW
-  - Abstract emotional substitutes: "a sad scene," "a happy moment," "emotional atmosphere"
-    — show it through objects, body language, light, and spatial relationships instead
+The image is not a mood board. It is a visual translation of what the narration is saying RIGHT NOW.
 
-PACING ALIGNMENT — IMAGE PROMPTS MUST MATCH SCENE RHYTHM:
+If the narration says "he checked his phone and nothing loaded" —
+  the image shows a person staring at a phone with a spinning loading icon.
 
-  Short punchy scenes (8–12s): tight framing, single subject, one dominant detail.
-    The image should be readable in 2 seconds. No complexity.
-  Standard scenes (12–16s): medium framing with a clear subject and readable environment.
-  Atmospheric scenes (16–20s): wider framing, richer environment, more layered detail.
-    The image rewards a longer gaze — use this for world-building or emotional landing beats.
+If the narration says "the ancient library held secrets no one had opened in centuries" —
+  the image shows dusty bookshelves, a cobwebbed door, an old untouched book.
 
-VISUAL VARIETY — MANDATORY:
+If the art style is a stickman cartoon — the stickman enacts the narration.
+If the art style is watercolor — a watercolor scene enacts the narration.
+The described scene is ALWAYS about the narration content. The style is injected elsewhere.
 
-Do not use the same framing for consecutive scenes. Vary between:
-  - Close-up on face or hands
-  - Medium shot showing subject in environment
-  - Wide establishing shot
-  - Over-the-shoulder or POV
-  - Low-angle looking up
-  - High-angle or bird's-eye
-  - Detail shot (object, texture, specific element)
+Think of it this way: the image is the narration, drawn.
 
-Monotonous framing is as damaging to retention as monotonous narration.
+---
 
-HUMAN ARTIST TEST:
-Before finalizing a prompt, ask: could a human artist, given only this description,
-paint or draw this scene accurately without asking a single clarifying question?
-If yes — good. If they'd have to guess anything important — add it.
+GEMINI IMAGEN PROMPT STRUCTURE
 
-Good example:
-  "A woman in her late 40s, wearing a grey wool coat, stands alone on a rain-wet city
-  sidewalk at night. She is looking up at a lit apartment window on the third floor of
-  a brick building across the street. Her hands are in her pockets. Her face is still
-  and unreadable — not sad, not angry, just present. Yellow light from the window
-  reflects on the wet pavement below it. The street is empty. A few fallen leaves are
-  pasted to the sidewalk by the rain. Wide shot from across the street."
+Gemini Imagen responds best to clear, natural-language descriptions that are:
+  - Specific about subject, action, environment, and mood cues
+  - Written in plain descriptive English (not tag-lists or comma dumps)
+  - Expressive but not overloaded — 2 to 4 strong sentences is ideal
+  - Direct about what is IN the scene, not how it should "feel"
 
-Bad example:
-  "A sad woman standing on a street at night, emotional scene, highly detailed."
+Structure each prompt as:
+  [What is happening right now — subject + action] + [Where it is happening — setting] +
+  [Key visual detail that encodes the emotion] + [Camera framing]
+
+---
+
+ART STYLE CONSISTENCY HINT
+
+The pipeline injects the art style as a prefix. Your prompt must work with that prefix naturally.
+So if the art style is "stickman whiteboard drawing" and you write:
+  "A stickman holds a sign that reads THIS IS WHY YOU ARE LAZY, standing on an empty white background"
+The combined prompt becomes:
+  "[stickman whiteboard drawing style] A stickman holds a sign..."
+This is correct. Do not fight the injected style — write your subject and action to fit it.
+
+When the user has set an expressive or illustrative style (stickman, cartoon, flat design):
+  - Characters should DO things, not just exist
+  - Objects, signs, speech bubbles, arrows, and labels are all valid and encouraged
+  - Exaggeration and visual metaphor are appropriate and welcome
+  - Keep compositions simple and readable — one or two focal elements per scene
+
+When the user has set a realistic or photographic style:
+  - Describe people, places, and objects with concrete physical detail
+  - Avoid abstraction — say what is literally visible
+  - No text-on-signs unless narratively essential
+
+---
+
+NARRATION-TO-IMAGE MATCHING EXAMPLES
+
+NARRATION: "Your brain is wired to avoid effort. It's not laziness — it's survival."
+GOOD IMAGE PROMPT: "A stickman figure lies flat on a couch while a large glowing brain floats above its head with small lightning bolts and a tiny white flag. The couch is in an empty white room. A small label near the brain reads 'SURVIVAL MODE'. The brain looks smug."
+WHY: The image shows what the narration is explaining — the brain's role — with expressive cartoon logic.
+
+NARRATION: "Every empire in history that overexpanded eventually collapsed under its own weight."
+GOOD IMAGE PROMPT: "A tall stack of stone blocks shaped like a tower leans dramatically to one side, cracks running up the sides. A tiny stickman king stands at the top holding a flag, oblivious. The base of the tower is crumbling. White background. Wide shot showing full tower height."
+WHY: The image literalizes the narration's metaphor — overexpansion, collapse — in scene.
+
+NARRATION: "She hadn't slept in thirty-six hours. The evidence board was everywhere."
+GOOD IMAGE PROMPT: "A woman with dark circles under her eyes sits on the floor of a cluttered room, back against the couch, surrounded by papers and sticky notes covering the walls and floor. Her coffee cup is tipped over and empty beside her. A single desk lamp lights the room from the corner. Medium shot showing her and the chaos around her."
+WHY: Exact match to the narration — the exhaustion and the evidence board are both present.
+
+---
+
+GEMINI IMAGEN SPECIFIC RULES
+
+DO include:
+  - Clear subject identification (who, what)
+  - Concrete action in progress (not "about to" or "having just" — RIGHT NOW)
+  - Setting details (indoors/outdoors, time of day, key objects present)
+  - One or two expressive props, signs, labels, or visual metaphors when appropriate
+  - Camera framing at the end of the prompt (close-up, wide shot, medium shot, overhead, etc.)
+
+DO NOT include:
+  - Style words: cinematic, photorealistic, anime, oil painting, cartoon, sketch, illustration
+  - Quality tokens: masterpiece, 8K, HDR, sharp focus, best quality, highly detailed
+  - Camera/lens specs: bokeh, 85mm, f/1.4, depth of field, anamorphic
+  - Vague emotional placeholders: "an emotional scene," "a powerful moment," "dramatic atmosphere"
+    — replace these with the concrete visual element that CREATES the emotion
+  - Art medium names that conflict with the injected style
+
+---
+
+SCENE-PACING ALIGNMENT FOR GEMINI IMAGEN
+
+Short scenes (8–12s): One subject, one action, minimal background detail.
+  The image must be instantly readable. No complexity. One idea per frame.
+  Example: "A stickman stares at a clock on the wall. The clock shows 3 AM. White background."
+
+Standard scenes (12–16s): Subject + action + environment. One supporting detail.
+  Example: "A woman in a yellow raincoat stands at a fork in the road, looking left and right.
+  Both paths disappear into fog. A small crumpled map is in her hand. Wide shot."
+
+Atmospheric scenes (16–20s): Richer environment, more layered detail, invites longer viewing.
+  Example: "A grand but decaying library hall with tall shelves on both sides, books scattered
+  across the floor, and a single shaft of dusty light falling from a cracked skylight onto
+  a large open book on a reading stand in the center. No people. Wide shot down the aisle."
+
+---
+
+VISUAL VARIETY — MANDATORY
+
+Vary the framing every scene. Do not repeat the same camera distance consecutively.
+Use in rotation:
+  - Close-up on face, hands, or a key object
+  - Medium shot showing subject in their environment
+  - Wide shot for scale, isolation, or world-building
+  - POV or over-the-shoulder when appropriate
+  - Overhead/bird's-eye for chaos, maps, or crowd moments
+  - Low-angle looking up for power, threat, or grandeur
+  - Detail/insert shot for a specific object, sign, or texture
+
+Monotonous framing kills retention as much as monotonous narration.
+
+---
+
+READABILITY TEST
+
+Before finalizing any imagePrompt, ask:
+  1. Does this image show what the narration is literally saying?
+  2. Could someone look at this image for 2 seconds and know what's happening?
+  3. Is there one clear focal point?
+  4. If the art style is expressive (stickman, cartoon), does the image DO something — not just exist?
+
+If all four are yes — the prompt is ready.
 
 ---
 

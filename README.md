@@ -25,5 +25,14 @@ now for creating a channel what is required
 3. the voice over
 4. the baground music
 
-script is done lets move on to voice over
+script is done - gemini flash
+lets see how can i make it better with other models and specialised inputs
+also modify the system prompt to add description field and other if necessary and make
+the image generation prompt more specific to decided model and art style
 
+tts is done - chatterbox
+i am satisfied with the quality now search for what type of audio i want also see if 
+1. making the emotion constant sounds better or variable is fine
+2. if breaking audio in chunks and then sticking sounds better or a continuous flow
+
+image generation
