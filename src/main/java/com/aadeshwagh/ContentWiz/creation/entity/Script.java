@@ -10,6 +10,7 @@ import java.util.List;
 public class Script {
     private String title;
     private String musicPrompt;
+    private String description;
     private List<Scene> scenes;
 
 }

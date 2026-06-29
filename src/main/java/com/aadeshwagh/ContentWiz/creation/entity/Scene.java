@@ -7,8 +7,10 @@ import lombok.Setter;
 @Setter
 public class Scene {
     private int sceneNumber;
-    private int duration;
     private String narration;
     private String mood;
     private String imagePrompt;
+    private CameraMovement cameraMovement = CameraMovement.STATIC;
+    private TransitionEffect transitionEffect = TransitionEffect.FADE;
+
 }

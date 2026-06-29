@@ -1,4 +1,4 @@
-package com.aadeshwagh.ContentWiz.creation.tts;
+package com.aadeshwagh.ContentWiz.creation.entity;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +19,7 @@ public enum Emotion {
     MELANCHOLIC(0.70f, 0.55f, 0.60f),
     NEUTRAL    (0.50f, 0.70f, 0.50f),
     CALM       (0.55f, 0.65f, 0.50f),
-    SINCERE    (0.65f, 0.70f, 0.55f),
+    SINCERE    (0.40f, 0.50f, 0.65f),
     DRAMATIC   (1.80f, 1.20f, 0.30f),
     WHISPER    (0.40f, 0.50f, 0.65f),
     WONDER     (1.00f, 0.95f, 0.45f),

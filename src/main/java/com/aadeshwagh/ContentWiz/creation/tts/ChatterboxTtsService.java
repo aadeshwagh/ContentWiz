@@ -1,5 +1,7 @@
 package com.aadeshwagh.ContentWiz.creation.tts;
 
+import com.aadeshwagh.ContentWiz.creation.entity.ChatterboxVoice;
+import com.aadeshwagh.ContentWiz.creation.entity.Emotion;
 import com.aadeshwagh.ContentWiz.creation.entity.Scene;
 import com.aadeshwagh.ContentWiz.creation.entity.Script;
 import jakarta.annotation.PostConstruct;
@@ -191,7 +193,7 @@ public class ChatterboxTtsService {
                         "{\"sceneNumber\":%d,\"narration\":%s,\"mood\":%s}",
                         s.getSceneNumber(),
                         jsonString(s.getNarration()),
-                        jsonString(s.getMood() != null ? s.getMood() : "NEUTRAL")
+                        jsonString("SINCERE")
                 ))
                 .collect(Collectors.joining(",", "[", "]"));
     }
@@ -276,10 +278,19 @@ public class ChatterboxTtsService {
                 log.info("Upgrading pip...");
                 runCommand(List.of(venvPython.toString(), "-m", "pip", "install", "--upgrade", "pip"));
 
-                log.info("Installing Python dependencies...");
+                // 1. Force install dependencies that need fresh downloads, bypassing the cache
+                log.info("Force-installing core dependencies without cache...");
                 runCommand(List.of(
                         venvPython.toString(), "-m", "pip", "install",
-                        "torch", "torchaudio", "chatterbox-tts", "soundfile", "peft"
+                        "--no-cache-dir", "--force-reinstall",
+                        "torch", "torchaudio", "soundfile", "peft"
+                ));
+
+                // 2. Standard install for chatterbox-tts so it uses existing/cached instances if available
+                log.info("Installing chatterbox-tts...");
+                runCommand(List.of(
+                        venvPython.toString(), "-m", "pip", "install",
+                        "chatterbox-tts"
                 ));
             }
 

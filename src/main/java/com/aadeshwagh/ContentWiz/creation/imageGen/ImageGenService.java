@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PreDestroy;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -44,9 +45,16 @@ public class ImageGenService {
     /**
      * Generates and downloads one PNG per scene concurrently.
      */
-    public void generateImages(Script script, String artStyle, String outputFolder) throws IOException {
+
+    public void generateImages(Script script, String stylePromptPath, String outputFolder) throws IOException {
         Path outputPath = Paths.get(outputFolder);
         Files.createDirectories(outputPath);
+
+        // Read art style prompt from file once
+        String artStyle = new String(
+                Files.readAllBytes(Paths.get(stylePromptPath)),
+                StandardCharsets.UTF_8
+        );
 
         Client client = Client.builder()
                 .apiKey(apiKey)
@@ -54,11 +62,14 @@ public class ImageGenService {
 
         GenerateContentConfig config = GenerateContentConfig.builder()
                 .responseModalities(List.of("IMAGE"))
+                .imageConfig(ImageConfig.builder()
+                        .aspectRatio("16:9")
+                        .build())
                 .build();
 
+        log.info("Loaded style prompt from: {}", stylePromptPath);
         log.info("Starting concurrent image generation for {} scenes...", script.getScenes().size());
 
-        // Process all scenes in parallel to save time
         List<CompletableFuture<Void>> futures = script.getScenes().stream()
                 .map(scene -> CompletableFuture.runAsync(() -> {
                     String prompt = buildPrompt(scene, artStyle);
@@ -72,10 +83,12 @@ public class ImageGenService {
                         );
 
                         byte[] imageBytes = extractImageBytes(response, scene.getSceneNumber());
+
                         String filename = String.format("scene_%02d.png", scene.getSceneNumber());
                         Path imagePath = outputPath.resolve(filename);
 
                         Files.write(imagePath, imageBytes);
+
                         log.info("Scene {} - Saved → {}", scene.getSceneNumber(), imagePath);
 
                     } catch (Exception e) {
@@ -85,8 +98,8 @@ public class ImageGenService {
                 }, executor))
                 .collect(Collectors.toList());
 
-        // Wait for all async tasks to complete before finishing the method
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
         log.info("Successfully generated all images for the script!");
     }
 
@@ -100,7 +113,7 @@ public class ImageGenService {
      */
     private String buildPrompt(Scene scene, String artStyle) {
         return String.format(
-                "Create a single image in a strictly 16:9 aspect ratio. " +
+                "Create a single image " +
                         "Art style: %s. " +
                         "The mood of this scene is: %s. " +
                         "Scene description: %s. " +
