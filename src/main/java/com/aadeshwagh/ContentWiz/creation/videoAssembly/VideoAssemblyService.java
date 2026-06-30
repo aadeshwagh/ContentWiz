@@ -32,6 +32,11 @@ public class VideoAssemblyService {
     private static final double PAUSE_MAX       = 1.2;  // cap so long scenes don't over-linger
     private static final double PAUSE_FINAL_EXTRA = 0.5; // extra buffer on the last scene only
 
+    private static final int SHORT_W = 1080;
+    private static final int SHORT_H = 1920;
+    private static final int BACKDROP_BLUR_SIGMA = 20;
+
+
     private double pauseFor(double audioDuration, boolean isLast) {
         double pause = Math.min(PAUSE_BASE + audioDuration * PAUSE_PER_SEC, PAUSE_MAX);
         return isLast ? pause + PAUSE_FINAL_EXTRA : pause;
@@ -62,6 +67,149 @@ public class VideoAssemblyService {
     // -------------------------------------------------------------------------
     // Public entry point
     // -------------------------------------------------------------------------
+    public List<Path> assembleShortVideos(Script script, List<com.aadeshwagh.ContentWiz.creation.entity.Shorts> shorts,
+                                          String workingDir, String outputDir)
+            throws IOException, InterruptedException {
+
+        if (shorts == null || shorts.isEmpty()) {
+            throw new IllegalArgumentException("No shorts provided");
+        }
+
+        Map<Integer, Scene> sceneByNumber = script.getScenes().stream()
+                .collect(java.util.stream.Collectors.toMap(Scene::getSceneNumber, s -> s));
+
+        Files.createDirectories(Paths.get(outputDir));
+
+        List<Path> outputs = new ArrayList<>();
+        for (com.aadeshwagh.ContentWiz.creation.entity.Shorts shortDef : shorts) {
+            outputs.add(assembleSingleShort(shortDef, sceneByNumber, workingDir, outputDir));
+        }
+        return outputs;
+    }
+    private Path assembleSingleShort(com.aadeshwagh.ContentWiz.creation.entity.Shorts shortDef,
+                                     Map<Integer, Scene> sceneByNumber,
+                                     String workingDir, String outputDir)
+            throws IOException, InterruptedException {
+
+        List<Scene> scenes = new ArrayList<>();
+        for (int n = shortDef.getStartScene(); n <= shortDef.getEndScene(); n++) {
+            Scene scene = sceneByNumber.get(n);
+            if (scene == null) {
+                throw new IllegalStateException(
+                        "Short \"" + shortDef.getTitle() + "\" references sceneNumber " + n
+                                + " which does not exist in the source script");
+            }
+            scenes.add(scene);
+        }
+
+        if (scenes.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Short \"" + shortDef.getTitle() + "\" resolves to zero scenes (startScene="
+                            + shortDef.getStartScene() + ", endScene=" + shortDef.getEndScene() + ")");
+        }
+
+        validateAssets(scenes, workingDir);
+
+        double[] audioDurations = probeAudioDurations(scenes, workingDir);
+        double[] pauseDurations = derivePauseDurations(scenes, audioDurations);
+        double[] transitionDurations = deriveTransitionDurations(scenes, audioDurations, pauseDurations);
+
+        log.info("Assembling short \"{}\" — scenes {}-{}, {} scene(s)",
+                shortDef.getTitle(), shortDef.getStartScene(), shortDef.getEndScene(), scenes.size());
+
+        Path outputPath = Paths.get(outputDir, sanitizeTitle(shortDef.getTitle()) + ".mp4");
+
+        List<String> command = buildShortFfmpegCommand(
+                scenes, audioDurations, transitionDurations, pauseDurations, workingDir, outputPath.toString());
+
+        runProcess(command, workingDir);
+
+        log.info("Short assembled: {}", outputPath);
+        return outputPath;
+    }
+    private List<String> buildShortFfmpegCommand(List<Scene> scenes, double[] audioDurations,
+                                                 double[] transitionDurations, double[] pauseDurations,
+                                                 String workingDir, String outputPath) {
+        List<String> cmd = new ArrayList<>();
+        cmd.add("ffmpeg");
+        cmd.add("-y");
+
+        for (int i = 0; i < scenes.size(); i++) {
+            int n = scenes.get(i).getSceneNumber();
+            double videoDuration = audioDurations[i] + pauseDurations[i];
+            String sceneNum = formatSceneNumber(n);
+
+            cmd.addAll(List.of("-loop", "1", "-t", String.valueOf(videoDuration),
+                    "-i", workingDir + "/scene_" + sceneNum + ".png"));
+            cmd.addAll(List.of("-i", workingDir + "/" + n + ".wav"));
+        }
+
+        cmd.addAll(List.of("-filter_complex",
+                buildShortFilterComplex(scenes, audioDurations, transitionDurations, pauseDurations)));
+        cmd.addAll(List.of("-map", "[vout]", "-map", "[aout]"));
+        cmd.addAll(List.of(
+                "-c:v", VIDEO_CODEC,
+                "-preset", "medium",
+                "-crf", "23",
+                "-c:a", AUDIO_CODEC,
+                "-b:a", "192k",
+                "-pix_fmt", PIXEL_FORMAT,
+                "-movflags", "+faststart",
+                outputPath
+        ));
+
+        return cmd;
+    }
+
+    private String buildShortFilterComplex(List<Scene> scenes, double[] audioDurations,
+                                           double[] transitionDurations, double[] pauseDurations) {
+        StringBuilder fc = new StringBuilder();
+        int count = scenes.size();
+
+        for (int i = 0; i < count; i++) {
+            Scene scene = scenes.get(i);
+            int videoInput = i * 2;
+            int audioInput = i * 2 + 1;
+            double leadIn = (i > 0) ? transitionDurations[i - 1] : 0.0;
+
+            fc.append(buildShortCameraFilter(videoInput, i, scene, audioDurations[i], pauseDurations[i], leadIn));
+            fc.append(String.format(
+                    "[%d:a]atrim=0:%.3f,asetpts=PTS-STARTPTS,apad=whole_dur=%.3f[a%d];%n",
+                    audioInput, audioDurations[i], audioDurations[i] + pauseDurations[i], i
+            ));
+        }
+
+        fc.append(buildXfadeChain(scenes, audioDurations, transitionDurations, pauseDurations));
+        fc.append(buildAudioConcat(count));
+
+        return fc.toString();
+    }
+
+    private String buildShortCameraFilter(int inputIndex, int sceneIndex, Scene scene,
+                                          double audioDuration, double pauseDuration, double leadIn) {
+        int motionFrames = (int) Math.ceil(audioDuration * FPS);
+        int totalFrames  = (int) Math.ceil((leadIn + audioDuration + pauseDuration) * FPS);
+
+        String zoomExpr = buildZoomExpression(scene.getCameraMovement(), motionFrames);
+        String xExpr    = buildXExpression(scene.getCameraMovement(), motionFrames);
+        String yExpr    = buildYExpression(scene.getCameraMovement(), motionFrames);
+
+        return String.format(
+                "[%d:v]" +
+                        "scale=%d:%d:force_original_aspect_ratio=decrease," +
+                        "pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black," +
+                        "scale=iw*2:ih*2," +
+                        "zoompan=z='%s':x='%s':y='%s':d=%d:s=%dx%d:fps=%d," +
+                        "trim=0:%.3f,setpts=PTS-STARTPTS" +
+                        "[v%d];%n",
+                inputIndex,
+                SHORT_W, SHORT_H,
+                SHORT_W, SHORT_H,
+                zoomExpr, xExpr, yExpr, totalFrames, SHORT_W, SHORT_H, FPS,
+                leadIn + audioDuration + pauseDuration,
+                sceneIndex
+        );
+    }
 
     public Path assembleVideo(Script script, String workingDir, String outputDir)
             throws IOException, InterruptedException {
@@ -389,14 +537,27 @@ public class VideoAssemblyService {
         pb.redirectErrorStream(true);
 
         Process process = pb.start();
+
+        StringBuilder output = new StringBuilder();
         try (var reader = process.inputReader()) {
-            reader.lines().forEach(line -> log.debug("[ffmpeg] {}", line));
+            reader.lines().forEach(line -> {
+                log.debug("[ffmpeg] {}", line);
+                output.append(line).append(System.lineSeparator());
+            });
         }
 
         int exitCode = process.waitFor();
         if (exitCode != 0) {
-            throw new RuntimeException("FFmpeg exited with code " + exitCode);
+            // ffmpeg's actual error is usually in the last ~30 lines
+            String tail = lastLines(output.toString(), 30);
+            throw new RuntimeException("FFmpeg exited with code " + exitCode + "\n--- ffmpeg output (tail) ---\n" + tail);
         }
+    }
+
+    private String lastLines(String text, int n) {
+        String[] lines = text.split(System.lineSeparator());
+        int start = Math.max(0, lines.length - n);
+        return String.join(System.lineSeparator(), java.util.Arrays.copyOfRange(lines, start, lines.length));
     }
 
     private double estimateTotalDuration(double[] audioDurations, double[] transitionDurations) {

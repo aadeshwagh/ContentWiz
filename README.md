@@ -32,9 +32,9 @@ the image generation prompt more specific to decided model and art style - done
 
 tts is done - chatterbox
 i am satisfied with the quality now search for what type of audio i want also see if 
-1. making the emotion constant sounds better or variable is fine
-2. if breaking audio in chunks and then sticking sounds better or a continuous flow
-3. make the script duration field adjusted to actual audio length
+1. making the emotion constant sounds better or variable is fine - yes done
+2. if breaking audio in chunks and then sticking sounds better or a continuous flow - it good as it is
+3. make the script duration field adjusted to actual audio length -done
 
 image generation
 its done but needed to use the gemini paid api added 1k in tokens lets see how many videos can be made with that
@@ -42,6 +42,12 @@ its done but needed to use the gemini paid api added 1k in tokens lets see how m
 2. generate a thumbnail based on the description
 
 creating video our of static images and audio files
+done
+
+music
+ok no music for now
+
+
 
 
 
@@ -49,10 +55,10 @@ lets fix the video assembly first - done
 
 fix the tags from script what are supported what not and test it  - done
 
-then the chose the right voice for the channel
+then the chose the right voice for the channel - done
 
 create the final video
 
-gaps in TTS - model dosent seem to understand capital words to emphisise them 
+gaps in TTS - model dosent seem to understand capital words to emphisise them - done
 
-remove the mood section completely
+remove the mood section completely - removed from tts

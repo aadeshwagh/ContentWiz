@@ -1,0 +1,27 @@
+{
+  "title": "The Whispering Box of Elias Thorne",
+  "musicPrompt": "A melancholic yet subtly hopeful instrumental score built around a solo cello and sparse piano. It opens with a quiet, searching cello melody over deep, ambient drones, reflecting solitude and struggle. As the box's mystery deepens, the music becomes tense and dissonant with low, sustained strings and unsettling, irregular piano notes, never resolving. During Elias's internal conflict and the storm, the tempo quickens slightly without percussion or aggression. The climax is a brief, intense burst of discordant strings. It then resolves into a quiet, reflective piano passage, signifying peace and a return to simplicity, carrying the journey's weight. Instrumental only, no vocals. Understated and atmospheric, designed to sit beneath spoken narration.",
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "duration": 16,
+      "narration": "Elias Thorne knew the sea. He knew its temper, its generosity, and its cruel indifference. For thirty years, his hands had pulled nets from its depths, but lately, the sea had given him little more than aching bones and empty promises.",
+      "mood": "HAPPY",
+      "imagePrompt": "A weathered fisherman, Elias, in his late 50s, with deep lines etched around his eyes, stands on a small, worn fishing boat. He's pulling an empty net from the grey, choppy sea. His expression is tired but determined. Over-the-shoulder shot from behind Elias, focusing on his hands and the net, with the vast, grey ocean stretching behind him."
+    },
+    {
+      "sceneNumber": 2,
+      "duration": 14,
+      "narration": "His shack clung to the cliff edge, a testament to his own stubborn survival. Each morning, he’d brave the cold, hoping today would be different. Today, he’d find something. Anything.",
+      "mood": "SAD",
+      "imagePrompt": "A wide shot of Elias's small, dilapidated wooden shack perched precariously on a rugged, windswept cliff overlooking a turbulent grey sea under a dawn sky. The shack is small, leaning, with a single smoking chimney. Waves crash dramatically against the rocks below. The light is cold and muted, with hints of orange on the horizon."
+    },
+    {
+      "sceneNumber": 3,
+      "duration": 12,
+      "narration": "This particular morning started like all the others. Until it didn't. As he hauled in his last net, a strange weight resisted, something heavier than any fish, something entirely unexpected.",
+      "mood": "DRAMATIC",
+      "imagePrompt": "Close-up on Elias's calloused hands, straining as he pulls a heavy fishing net onto the deck of his small boat. The net is tangled, and a dark, indistinct shape is visible within its folds, glowing faintly with an internal, soft light. The sea spray is visible on his hands. The background is blurred, dark water."
+    }
+  ]
+}
