@@ -11,27 +11,6 @@ VOICES_DIR = "/Users/aadeshwagh/ContentWiz/src/main/resources/voices/chatterbox-
 # Best available resampler in torchaudio — sinc_interp_kaiser minimises aliasing
 RESAMPLE_METHOD = "sinc_interp_kaiser"
 
-# Mood → (exaggeration, temperature, cfg_weight)
-# Full ChatterboxTTS honours ALL three params — tuned for maximum expressiveness
-MOOD_PARAMS = {
-    "HAPPY":       (0.90, 0.85, 0.50),
-    "EXCITED":     (1.40, 1.10, 0.40),
-    "CHEERFUL":    (1.00, 0.90, 0.45),
-    "AMUSED":      (0.95, 0.85, 0.50),
-    "SAD":         (0.60, 0.60, 0.55),
-    "ANGRY":       (1.50, 1.10, 0.35),
-    "ANXIOUS":     (1.10, 1.00, 0.40),
-    "MELANCHOLIC": (0.70, 0.55, 0.60),
-    "NEUTRAL":     (0.50, 0.70, 0.50),
-    "CALM":        (0.55, 0.65, 0.50),
-    "SINCERE":     (0.65, 0.70, 0.55),
-    "DRAMATIC":    (1.80, 1.20, 0.30),
-    "WHISPER":     (0.40, 0.50, 0.65),
-    "WONDER":      (1.00, 0.95, 0.45),
-    "CONFUSED":    (0.80, 0.90, 0.50),
-    "SARCASTIC":   (1.20, 1.00, 0.40),
-}
-
 
 def resolve_voice_path(voice_name: str) -> str | None:
     name = voice_name if voice_name.lower().endswith(".wav") else f"{voice_name}.wav"
@@ -63,8 +42,10 @@ def parse_args():
         metavar="JSON",
         help=(
             'JSON array of scenes:\n'
-            '  \'[{"sceneNumber":1,"narration":"Hello","mood":"NEUTRAL"},...]\'\n'
-            "Each scene saved as <output-folder>/<sceneNumber>.wav"
+            '  \'[{"sceneNumber":1,"narration":"Hello"},...]\'\n'
+            "Each scene saved as <output-folder>/<sceneNumber>.wav.\n"
+            "All scenes in the batch share the same --exaggeration / --temperature / "
+            "--cfg_weight (the script's single emotion)."
         ),
     )
     parser.add_argument(
@@ -76,6 +57,8 @@ def parse_args():
     # Single mode (CLI testing)
     parser.add_argument("--text",         help="Single narration text.")
     parser.add_argument("--output_path",  help="Output WAV path for single mode.")
+
+    # Emotion params — applied once, shared across every scene in batch mode
     parser.add_argument("--exaggeration", type=float, default=0.5,
                         help="Emotion intensity 0.0-2.0 (default: 0.5)")
     parser.add_argument("--temperature",  type=float, default=0.8,
@@ -264,27 +247,39 @@ def generate_one(
     print(f"OK: Saved → {output_path}", file=sys.stderr)
 
 
-def run_batch(model, scenes: list, output_folder: str, ref_path: str | None):
+def run_batch(
+    model,
+    scenes: list,
+    output_folder: str,
+    ref_path: str | None,
+    exaggeration: float,
+    temperature: float,
+    cfg_weight: float,
+):
+    """
+    Generate audio for every scene using ONE shared exaggeration / temperature /
+    cfg_weight — the emotion now applies to the whole script, not per scene.
+    """
     os.makedirs(output_folder, exist_ok=True)
     total = len(scenes)
+
+    print(
+        f"INFO: Batch emotion params (applied to all {total} scenes) | "
+        f"exag={exaggeration} temp={temperature} cfg={cfg_weight}",
+        file=sys.stderr,
+    )
 
     for i, scene in enumerate(scenes, start=1):
         scene_number = scene.get("sceneNumber", i)
         narration    = scene.get("narration", "").strip()
-        mood         = scene.get("mood", "NEUTRAL").upper().strip()
 
         if not narration:
             print(f"WARN: Scene {scene_number} has no narration — skipping", file=sys.stderr)
             continue
 
-        exaggeration, temperature, cfg_weight = MOOD_PARAMS.get(mood, MOOD_PARAMS["NEUTRAL"])
         output_path = os.path.join(output_folder, f"{scene_number}.wav")
 
-        print(
-            f"INFO: [{i}/{total}] Scene {scene_number} | mood={mood} | "
-            f"exag={exaggeration} temp={temperature} cfg={cfg_weight}",
-            file=sys.stderr,
-        )
+        print(f"INFO: [{i}/{total}] Scene {scene_number}", file=sys.stderr)
 
         generate_one(
             model, narration, exaggeration, temperature,
@@ -357,7 +352,10 @@ def main():
             except json.JSONDecodeError as e:
                 print(f"ERROR: Invalid --scenes-json: {e}", file=sys.stderr)
                 sys.exit(1)
-            run_batch(model, scenes, args.output_folder, active_ref)
+            run_batch(
+                model, scenes, args.output_folder, active_ref,
+                args.exaggeration, args.temperature, args.cfg_weight,
+            )
             print(f"OK: All scenes written to {args.output_folder}", file=sys.stderr)
         else:
             run_single(model, args, active_ref)

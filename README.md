@@ -52,3 +52,7 @@ fix the tags from script what are supported what not and test it  - done
 then the chose the right voice for the channel
 
 create the final video
+
+gaps in TTS - model dosent seem to understand capital words to emphisise them 
+
+remove the mood section completely
