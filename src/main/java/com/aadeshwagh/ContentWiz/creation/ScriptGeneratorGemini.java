@@ -9,6 +9,7 @@ import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
 import com.google.genai.types.Schema;
 import com.google.genai.types.Type;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -16,27 +17,30 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Service
+@Slf4j
 public class ScriptGeneratorGemini implements ScriptGenerator {
 
     private final String geminiModel;
     private final ObjectMapper objectMapper;
     private final Client geminiClient;
-    private final String systemPrompt;
+
 
     @Autowired
-    public ScriptGeneratorGemini(@Value("${google.gemini.model}") String geminiModel, ObjectMapper objectMapper, @Value("${google.gemini.api.key}") String apiKey, @Value("${content.script.system.prompt}") String scriptPromptPath) {
+    public ScriptGeneratorGemini(
+            @Value("${google.gemini.model}") String geminiModel,
+            ObjectMapper objectMapper,
+            @Value("${google.gemini.api.key}") String apiKey) {
         this.geminiModel = geminiModel;
         this.objectMapper = objectMapper;
         this.geminiClient = Client.builder()
                 .apiKey(apiKey)
                 .build();
-
-        this.systemPrompt = loadPromptFromFile(scriptPromptPath);
     }
 
     private String loadPromptFromFile(String path) {
@@ -52,70 +56,93 @@ public class ScriptGeneratorGemini implements ScriptGenerator {
 
         Schema sceneSchema = Schema.builder()
                 .type(Type.Known.OBJECT)
-                .properties(ImmutableMap.of(
-                        "sceneNumber",
-                        Schema.builder()
-                                .type(Type.Known.INTEGER)
-                                .description("Sequential scene number starting from 1.")
-                                .build(),
-
-                        "duration",
-                        Schema.builder()
-                                .type(Type.Known.INTEGER)
-                                .description("Duration in seconds. Must be between 8 and 20.")
-                                .build(),
-
-                        "narration",
-                        Schema.builder()
-                                .type(Type.Known.STRING)
-                                .description("Spoken narration for Orpheus TTS 3B.")
-                                .build(),
-
-                        "mood",
-                        Schema.builder()
-                                .type(Type.Known.STRING)
-                                .description("Scene mood.")
-                                .build(),
-
-                        "imagePrompt",
-                        Schema.builder()
-                                .type(Type.Known.STRING)
-                                .description("Prompt for image generation.")
-                                .build()
-                ))
-                .required(List.of("sceneNumber", "duration", "narration", "mood", "imagePrompt"))
+                .properties(ImmutableMap.<String, Schema>builder()
+                        .put("sceneNumber",
+                                Schema.builder()
+                                        .type(Type.Known.INTEGER)
+                                        .description("Sequential scene number starting from 1.")
+                                        .build())
+                        .put("narration",
+                                Schema.builder()
+                                        .type(Type.Known.STRING)
+                                        .description("Spoken narration for Chatterbox Turbo TTS. Written with rhythm variation, contractions, and optional paralinguistic tags.")
+                                        .build())
+                        .put("mood",
+                                Schema.builder()
+                                        .type(Type.Known.STRING)
+                                        .enum_(List.of(
+                                                "HAPPY", "EXCITED", "CHEERFUL", "AMUSED",
+                                                "SAD", "ANGRY", "ANXIOUS", "MELANCHOLIC",
+                                                "NEUTRAL", "CALM", "SINCERE", "DRAMATIC",
+                                                "WHISPER", "WONDER", "CONFUSED", "SARCASTIC"
+                                        ))
+                                        .description("Emotional register of the scene. Must be exactly one of the approved uppercase values.")
+                                        .build())
+                        .put("imagePrompt",
+                                Schema.builder()
+                                        .type(Type.Known.STRING)
+                                        .description("Scene image description for Gemini Imagen. No style words. Describes subject, action, setting, and camera framing.")
+                                        .build())
+                        .put("cameraMovement",
+                                Schema.builder()
+                                        .type(Type.Known.STRING)
+                                        .enum_(List.of(
+                                                "ZOOM_IN", "ZOOM_OUT",
+                                                "PAN_LEFT", "PAN_RIGHT",
+                                                "PAN_UP", "PAN_DOWN",
+                                                "STATIC"
+                                        ))
+                                        .description("Ken Burns camera movement applied to the scene image. Chosen based on the emotional direction of the scene.")
+                                        .build())
+                        .put("transitionEffect",
+                                Schema.builder()
+                                        .type(Type.Known.STRING)
+                                        .enum_(List.of(
+                                                "FADE", "DISSOLVE",
+                                                "WIPE_LEFT", "WIPE_RIGHT",
+                                                "SLIDE_LEFT", "SLIDE_RIGHT",
+                                                "PIXELIZE", "RADIAL", "NONE"
+                                        ))
+                                        .description("Visual transition from this scene into the next. Chosen based on the editorial relationship between this scene and the next.")
+                                        .build())
+                        .build())
+                .required(List.of("sceneNumber", "narration", "mood", "imagePrompt", "cameraMovement", "transitionEffect"))
                 .build();
 
         return Schema.builder()
                 .type(Type.Known.OBJECT)
-                .properties(ImmutableMap.of(
-                        "title",
-                        Schema.builder()
-                                .type(Type.Known.STRING)
-                                .description("Engaging video title.")
-                                .build(),
-
-                        "musicPrompt",
-                        Schema.builder()
-                                .type(Type.Known.STRING)
-                                .description("Background music prompt.")
-                                .build(),
-
-                        "scenes",
-                        Schema.builder()
-                                .type(Type.Known.ARRAY)
-                                .items(sceneSchema)
-                                .description("List of scenes.")
-                                .build()
-                ))
-                .required(List.of("title", "musicPrompt", "scenes"))
+                .properties(ImmutableMap.<String, Schema>builder()
+                        .put("title",
+                                Schema.builder()
+                                        .type(Type.Known.STRING)
+                                        .description("Engaging video title under 80 characters.")
+                                        .build())
+                        .put("description",
+                                Schema.builder()
+                                        .type(Type.Known.STRING)
+                                        .description("Description of whole topic what its is about and all")
+                                        .build())
+                        .put("musicPrompt",
+                                Schema.builder()
+                                        .type(Type.Known.STRING)
+                                        .description("Background music description for AI music generation. Prose only, 60-120 words, instrumental only.")
+                                        .build())
+                        .put("scenes",
+                                Schema.builder()
+                                        .type(Type.Known.ARRAY)
+                                        .items(sceneSchema)
+                                        .description("Ordered list of scenes. Between 35 and 80 scenes.")
+                                        .build())
+                        .build())
+                .required(List.of("title", "musicPrompt", "scenes","description"))
                 .build();
     }
+
     @Override
-    public Script generateScript(String storyOrPrompt) {
-        try{
+    public void generateScript(String storyOrPrompt, String scriptPromptPath ,String outputDir) {
+        try {
             Content systemInstruction = Content.fromParts(
-                    Part.fromText(systemPrompt)
+                    Part.fromText(loadPromptFromFile(scriptPromptPath))
             );
 
             GenerateContentConfig config = GenerateContentConfig.builder()
@@ -130,10 +157,14 @@ public class ScriptGeneratorGemini implements ScriptGenerator {
                     storyOrPrompt,
                     config
             );
-            return objectMapper.readValue(response.text(),Script.class);
-        }catch (Exception e){
+
+            Script script = objectMapper.readValue(response.text(), Script.class);
+            log.info(response.text());
+            objectMapper.writerWithDefaultPrettyPrinter()
+                    .writeValue(new File(outputDir + "/script.json"), script);
+            log.info("Script generation completed — {} scenes", script.getScenes().size());
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
-
     }
 }

@@ -1,4 +1,4 @@
-package com.aadeshwagh.ContentWiz.creation.tts;
+package com.aadeshwagh.ContentWiz.creation.entity;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

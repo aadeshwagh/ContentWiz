@@ -1,5 +1,7 @@
 package com.aadeshwagh.ContentWiz.creation.tts;
 
+import com.aadeshwagh.ContentWiz.creation.entity.ChatterboxVoice;
+import com.aadeshwagh.ContentWiz.creation.entity.Emotion;
 import com.aadeshwagh.ContentWiz.creation.entity.Scene;
 import com.aadeshwagh.ContentWiz.creation.entity.Script;
 import jakarta.annotation.PostConstruct;
@@ -37,25 +39,29 @@ public class ChatterboxTtsService {
     /**
      * Generate TTS for every scene in the script in a single Python process.
      * The model is loaded once; each scene is saved as <outputFolder>/<sceneNumber>.wav
+     * The Emotion applies to the ENTIRE script — every scene is voiced with the
+     * same exaggeration / temperature / cfg_weight.
      *
      * @param script       the full script with scenes
+     * @param emotion      the single emotion/tone applied across all scenes
      * @param voice        which built-in voice to use
      * @param outputFolder directory where scene WAV files will be written
      */
-    public void generateForScript(Script script, ChatterboxVoice voice, String outputFolder) {
+    public void generateForScript(Script script, Emotion emotion, ChatterboxVoice voice, String outputFolder) {
         if (script == null || script.getScenes() == null || script.getScenes().isEmpty()) {
             throw new IllegalArgumentException("Script must contain at least one scene");
         }
 
+        Emotion tone = emotion != null ? emotion : Emotion.NEUTRAL;
         ChatterboxVoice selectedVoice = voice != null ? voice : ChatterboxVoice.LUCY;
 
-        log.info("Starting TTS batch | script='{}' | scenes={} | voice={} | output={}",
-                script.getTitle(), script.getScenes().size(), selectedVoice, outputFolder);
+        log.info("Starting TTS batch | script='{}' | scenes={} | emotion={} | voice={} | output={}",
+                script.getTitle(), script.getScenes().size(), tone, selectedVoice, outputFolder);
 
         // Serialise scenes to a JSON array — Python will iterate them with one model load
         String scenesJson = buildScenesJson(script.getScenes());
 
-        List<String> command = buildBatchCommand(scenesJson, selectedVoice, null, outputFolder);
+        List<String> command = buildBatchCommand(scenesJson, tone, selectedVoice, null, outputFolder);
         runProcess(command);
 
         log.info("TTS batch complete | {} scenes written to {}",
@@ -64,17 +70,21 @@ public class ChatterboxTtsService {
 
     /**
      * Generate TTS for every scene using a custom voice reference WAV.
+     * The Emotion applies to the ENTIRE script — every scene is voiced with the
+     * same exaggeration / temperature / cfg_weight.
      */
-    public void generateForScript(Script script, String voiceReferencePath, String outputFolder) {
+    public void generateForScript(Script script, Emotion emotion, String voiceReferencePath, String outputFolder) {
         if (script == null || script.getScenes() == null || script.getScenes().isEmpty()) {
             throw new IllegalArgumentException("Script must contain at least one scene");
         }
 
-        log.info("Starting TTS batch | script='{}' | scenes={} | voiceRef={} | output={}",
-                script.getTitle(), script.getScenes().size(), voiceReferencePath, outputFolder);
+        Emotion tone = emotion != null ? emotion : Emotion.NEUTRAL;
+
+        log.info("Starting TTS batch | script='{}' | scenes={} | emotion={} | voiceRef={} | output={}",
+                script.getTitle(), script.getScenes().size(), tone, voiceReferencePath, outputFolder);
 
         String scenesJson = buildScenesJson(script.getScenes());
-        List<String> command = buildBatchCommand(scenesJson, null, voiceReferencePath, outputFolder);
+        List<String> command = buildBatchCommand(scenesJson, tone, null, voiceReferencePath, outputFolder);
         runProcess(command);
 
         log.info("TTS batch complete | {} scenes written to {}",
@@ -122,10 +132,11 @@ public class ChatterboxTtsService {
     // -------------------------------------------------------------------------
 
     /**
-     * Build the batch command: passes all scenes as a JSON array in one go.
-     * Python loads the model once and iterates scenes internally.
+     * Build the batch command: passes all scenes as a JSON array in one go,
+     * along with a single exaggeration/temperature/cfg_weight derived from the
+     * script-level Emotion. Python applies these same params to every scene.
      */
-    private List<String> buildBatchCommand(String scenesJson, ChatterboxVoice voice,
+    private List<String> buildBatchCommand(String scenesJson, Emotion tone, ChatterboxVoice voice,
                                            String voiceRef, String outputFolder) {
         List<String> cmd = new ArrayList<>();
         cmd.add(pythonExecutable);
@@ -136,6 +147,15 @@ public class ChatterboxTtsService {
 
         cmd.add("--output-folder");
         cmd.add(outputFolder);
+
+        cmd.add("--exaggeration");
+        cmd.add(String.valueOf(tone.getExaggeration()));
+
+        cmd.add("--temperature");
+        cmd.add(String.valueOf(tone.getTemperature()));
+
+        cmd.add("--cfg_weight");
+        cmd.add(String.valueOf(tone.getCfgWeight()));
 
         addVoiceArgs(cmd, voice, voiceRef);
         return cmd;
@@ -182,16 +202,16 @@ public class ChatterboxTtsService {
     /**
      * Serialise a list of scenes to a compact JSON array.
      * Avoids pulling in Jackson/Gson — the fields are simple enough to build manually.
-     * Format: [{"sceneNumber":1,"narration":"...","mood":"NEUTRAL"}, ...]
+     * Format: [{"sceneNumber":1,"narration":"..."}, ...]
+     * No mood field — emotion is now applied once for the whole script via CLI args.
      */
     private String buildScenesJson(List<Scene> scenes) {
         return scenes.stream()
                 .filter(s -> s.getNarration() != null && !s.getNarration().isBlank())
                 .map(s -> String.format(
-                        "{\"sceneNumber\":%d,\"narration\":%s,\"mood\":%s}",
+                        "{\"sceneNumber\":%d,\"narration\":%s}",
                         s.getSceneNumber(),
-                        jsonString(s.getNarration()),
-                        jsonString(s.getMood() != null ? s.getMood() : "NEUTRAL")
+                        jsonString(s.getNarration())
                 ))
                 .collect(Collectors.joining(",", "[", "]"));
     }
@@ -276,10 +296,19 @@ public class ChatterboxTtsService {
                 log.info("Upgrading pip...");
                 runCommand(List.of(venvPython.toString(), "-m", "pip", "install", "--upgrade", "pip"));
 
-                log.info("Installing Python dependencies...");
+                // 1. Force install dependencies that need fresh downloads, bypassing the cache
+                log.info("Force-installing core dependencies without cache...");
                 runCommand(List.of(
                         venvPython.toString(), "-m", "pip", "install",
-                        "torch", "torchaudio", "chatterbox-tts", "soundfile", "peft"
+                        "--no-cache-dir", "--force-reinstall",
+                        "torch", "torchaudio", "soundfile", "peft"
+                ));
+
+                // 2. Standard install for chatterbox-tts so it uses existing/cached instances if available
+                log.info("Installing chatterbox-tts...");
+                runCommand(List.of(
+                        venvPython.toString(), "-m", "pip", "install",
+                        "chatterbox-tts"
                 ));
             }
 

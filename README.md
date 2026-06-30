@@ -26,13 +26,33 @@ now for creating a channel what is required
 4. the baground music
 
 script is done - gemini flash
-lets see how can i make it better with other models and specialised inputs
-also modify the system prompt to add description field and other if necessary and make
-the image generation prompt more specific to decided model and art style
+lets see how can i make it better with other models and specialised inputs - done made it style specific
+also modify the system prompt to add description field and other if necessary and make - done
+the image generation prompt more specific to decided model and art style - done
 
 tts is done - chatterbox
 i am satisfied with the quality now search for what type of audio i want also see if 
 1. making the emotion constant sounds better or variable is fine
 2. if breaking audio in chunks and then sticking sounds better or a continuous flow
+3. make the script duration field adjusted to actual audio length
 
 image generation
+its done but needed to use the gemini paid api added 1k in tokens lets see how many videos can be made with that
+1. see how can you move the static images, or add some sort of revelent gifs on it or so
+2. generate a thumbnail based on the description
+
+creating video our of static images and audio files
+
+
+
+lets fix the video assembly first - done
+
+fix the tags from script what are supported what not and test it  - done
+
+then the chose the right voice for the channel
+
+create the final video
+
+gaps in TTS - model dosent seem to understand capital words to emphisise them 
+
+remove the mood section completely
