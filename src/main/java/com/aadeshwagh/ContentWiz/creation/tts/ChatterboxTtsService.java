@@ -261,21 +261,21 @@ public class ChatterboxTtsService {
         List<String> jsonScenes = new ArrayList<>();
 
         for (MovieRecapScene scene : scenes) {
-            String sceneNo = scene.getSceneNo();
+            int sceneNo = scene.getSceneNo();
             String narration = scene.getNarration();
 
             if (narration == null || narration.isBlank()) {
                 log.warn("Scene {} has blank narration — skipping TTS generation for this scene", sceneNo);
                 continue;
             }
-            if (sceneNo == null || sceneNo.isBlank()) {
+            if (sceneNo == 0 ) {
                 throw new IllegalArgumentException("MovieRecapScene is missing sceneNo (narration starts: \""
                         + narration.substring(0, Math.min(40, narration.length())) + "...\")");
             }
 
             int sceneNumber;
             try {
-                sceneNumber = Integer.parseInt(sceneNo.trim());
+                sceneNumber = sceneNo;
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException("MovieRecapScene has a non-numeric sceneNo: " + sceneNo, e);
             }

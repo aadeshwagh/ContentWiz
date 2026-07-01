@@ -83,7 +83,7 @@ public class MovieRecapScriptWriter {
                                         .description("Narration for this scene written for the Chatterbox TTS Full model: paraphrased (never verbatim subtitle dialogue), TTS-safe spoken English, describing what happens in the scene, who is involved, and why it matters.")
                                         .build())
                         .build())
-                .required(List.of("clipStartTime", "clipEndTime", "narration"))
+                .required(List.of("sceneNo", "clipStartTime", "clipEndTime", "narration"))
                 .build();
 
         return Schema.builder()

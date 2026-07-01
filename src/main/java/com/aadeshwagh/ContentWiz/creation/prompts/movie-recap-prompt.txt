@@ -43,7 +43,32 @@ SCENE SEGMENTATION RULES
 -----------------------------------
 
 Divide the movie into meaningful scenes based on the SRT timestamps. A scene is NOT every subtitle block.
-number each scene form 1 to till it goes its represented by sceneNo in the schema
+SCENE NUMBERING RULES (STRICT)
+
+Every scene MUST contain a field called "sceneNo".
+
+Rules:
+- sceneNo starts at 1
+- sceneNo increments by exactly 1 for every scene
+- No duplicates
+- No missing numbers
+- No skipped numbers
+- sceneNo must match the scene's position in the scenes array
+
+Examples:
+First scene -> sceneNo = 1
+Second scene -> sceneNo = 2
+Third scene -> sceneNo = 3
+
+If there are 57 scenes, the last scene must have sceneNo = 57.
+
+Invalid examples:
+1, 2, 4 (missing 3)
+1, 2, 2 (duplicate)
+0, 1, 2 (must start from 1)
+
+Before returning output, verify that:
+scenes[i].sceneNo == i + 1 for every scene.
 A new scene starts when there is:
 - A location change
 - A time jump
@@ -200,7 +225,7 @@ The JSON must match this exact structure and field names, with no extra fields a
   "description": "string",
   "scenes": [
     {
-       "sceneNo": integer,
+      "sceneNo": integer,
       "clipStartTime": "HH:MM:SS,mmm",
       "clipEndTime": "HH:MM:SS,mmm",
       "narration": "string"
@@ -214,7 +239,11 @@ JSON validity rules:
 - No trailing commas
 - No comments inside the JSON
 - No fields outside of title, description, and scenes at the top level
-- No fields inside a scene object other than clipStartTime, clipEndTime, and narration
+No fields inside a scene object other than:
+- sceneNo
+- clipStartTime
+- clipEndTime
+- narration
 
 -----------------------------------
 FINAL QUALITY CHECK BEFORE RETURNING OUTPUT
@@ -227,7 +256,12 @@ Before returning the final JSON, verify:
 - Narration is written in natural, TTS-safe spoken English per the rules above
 - Total narration word count is roughly 1,800-3,200 words, targeting 2,000-2,800
 - Timestamps are in strict chronological order with no overlaps and no gaps in coverage
-- Every scene object has exactly the three required fields, correctly named
+Every scene object has exactly these four fields:
+- sceneNo
+- clipStartTime
+- clipEndTime
+- narration
 - The output is a single valid JSON object and nothing else
+- sceneNo starts at 1 and increments by exactly 1 with no duplicates or skipped values
 
 Return the final JSON only.

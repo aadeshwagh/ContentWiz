@@ -6,7 +6,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class MovieRecapScene {
-   String sceneNo;
+   int sceneNo;
    String clipStartTime;
    String clipEndTime;
    String narration;
