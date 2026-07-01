@@ -82,6 +82,10 @@ public class MetaDataService {
     }
 
     private MetaData loadShortMetaData(String type){
+        File file = new File(contentRoot+"/"+type+"/short/metadata.json");
+        if(!file.exists()){
+            return new MetaData();
+        }
         return objectMapper.readValue(new File(contentRoot+"/"+type+"/short/metadata.json"),MetaData.class);
     }
 

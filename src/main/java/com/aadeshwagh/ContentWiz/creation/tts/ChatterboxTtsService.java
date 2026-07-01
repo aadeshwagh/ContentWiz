@@ -1,9 +1,6 @@
 package com.aadeshwagh.ContentWiz.creation.tts;
 
-import com.aadeshwagh.ContentWiz.creation.entity.ChatterboxVoice;
-import com.aadeshwagh.ContentWiz.creation.entity.Emotion;
-import com.aadeshwagh.ContentWiz.creation.entity.Scene;
-import com.aadeshwagh.ContentWiz.creation.entity.Script;
+import com.aadeshwagh.ContentWiz.creation.entity.*;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -62,6 +59,41 @@ public class ChatterboxTtsService {
         String scenesJson = buildScenesJson(script.getScenes());
 
         List<String> command = buildBatchCommand(scenesJson, tone, selectedVoice, null, outputFolder);
+        runProcess(command);
+
+        log.info("TTS batch complete | {} scenes written to {}",
+                script.getScenes().size(), outputFolder);
+    }
+
+    /**
+     * Generate TTS for every scene of a movie recap script in a single Python process.
+     * The model is loaded once; each scene is saved as <outputFolder>/<sceneNumber>.wav,
+     * where sceneNumber is the scene's 1-indexed position in script.getScenes() — this
+     * matches the numbering RecapVideoAssembly expects when it looks up narration files.
+     * The Emotion applies to the ENTIRE script — every scene is voiced with the same
+     * exaggeration / temperature / cfg_weight. Voicing uses a custom voice reference WAV,
+     * since MovieRecapScript has no per-scene or script-level built-in voice concept.
+     *
+     * @param script             the movie recap script with ordered scenes
+     * @param emotion            the single emotion/tone applied across all scenes
+     * @param voiceReferencePath path to a reference WAV used to clone the narrator voice
+     * @param outputFolder       directory where scene WAV files will be written
+     */
+    public void generateForMovieScript(MovieRecapScript script, Emotion emotion, String voiceReferencePath, String outputFolder) {
+        if (script == null || script.getScenes() == null || script.getScenes().isEmpty()) {
+            throw new IllegalArgumentException("Script must contain at least one scene");
+        }
+        if (voiceReferencePath == null || voiceReferencePath.isBlank()) {
+            throw new IllegalArgumentException("voiceReferencePath must not be blank");
+        }
+
+        Emotion tone = emotion != null ? emotion : Emotion.NEUTRAL;
+
+        log.info("Starting TTS batch | script='{}' | scenes={} | emotion={} | voiceRef={} | output={}",
+                script.getTitle(), script.getScenes().size(), tone, voiceReferencePath, outputFolder);
+
+        String scenesJson = buildMovieScenesJson(script.getScenes());
+        List<String> command = buildBatchCommand(scenesJson, tone, null, voiceReferencePath, outputFolder);
         runProcess(command);
 
         log.info("TTS batch complete | {} scenes written to {}",
@@ -214,6 +246,48 @@ public class ChatterboxTtsService {
                         jsonString(s.getNarration())
                 ))
                 .collect(Collectors.joining(",", "[", "]"));
+    }
+
+    /**
+     * Serialise a list of MovieRecapScene objects to the same compact JSON array format
+     * the Python script expects: [{"sceneNumber":1,"narration":"..."}, ...]
+     * <p>
+     * Uses each scene's own sceneNo field (as produced by the script generation model)
+     * rather than list position, so scene N here always corresponds to scene N's
+     * clipStartTime/clipEndTime in the script and to "N.wav" as consumed downstream by
+     * RecapVideoAssembly.
+     */
+    private String buildMovieScenesJson(List<MovieRecapScene> scenes) {
+        List<String> jsonScenes = new ArrayList<>();
+
+        for (MovieRecapScene scene : scenes) {
+            String sceneNo = scene.getSceneNo();
+            String narration = scene.getNarration();
+
+            if (narration == null || narration.isBlank()) {
+                log.warn("Scene {} has blank narration — skipping TTS generation for this scene", sceneNo);
+                continue;
+            }
+            if (sceneNo == null || sceneNo.isBlank()) {
+                throw new IllegalArgumentException("MovieRecapScene is missing sceneNo (narration starts: \""
+                        + narration.substring(0, Math.min(40, narration.length())) + "...\")");
+            }
+
+            int sceneNumber;
+            try {
+                sceneNumber = Integer.parseInt(sceneNo.trim());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("MovieRecapScene has a non-numeric sceneNo: " + sceneNo, e);
+            }
+
+            jsonScenes.add(String.format(
+                    "{\"sceneNumber\":%d,\"narration\":%s}",
+                    sceneNumber,
+                    jsonString(narration)
+            ));
+        }
+
+        return jsonScenes.stream().collect(Collectors.joining(",", "[", "]"));
     }
 
     /** Minimal JSON string escaping for narration text. */

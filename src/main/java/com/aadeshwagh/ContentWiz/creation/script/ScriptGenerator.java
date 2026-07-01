@@ -6,7 +6,8 @@ import com.aadeshwagh.ContentWiz.creation.entity.Shorts;
 import java.util.List;
 
 public interface ScriptGenerator {
-      void generateScript(String userInput,String scriptPromptPath ,String outputDir);
 
-      List<Shorts> generateShorts(Script script);
+    void generateScript(String storyOrPrompt, String scriptPromptPath, String outputDir, String name);
+
+    List<Shorts> generateShorts(Script script);
 }

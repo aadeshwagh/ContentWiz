@@ -54,9 +54,9 @@ public class UploadService {
         for(VideoInfo videoInfo : shortV.getInfos()){
             publishShortVideo(videoInfo);
         }
-        for(VideoInfo videoInfo : longV.getInfos()){
-            publishLongVideo(videoInfo);
-        }
+//        for(VideoInfo videoInfo : longV.getInfos()){
+//            publishLongVideo(videoInfo);
+//        }
 
     }
 
@@ -64,9 +64,9 @@ public class UploadService {
         //do something with return values update the metadata file
         String instaStatus  =uploadToInstagramChannel(videoInfo.getType(), videoInfo.getVideoUrl(),videoInfo.getCaption());
         log.info(instaStatus);
-        String ytStatus = uploadToYoutubeChannel(videoInfo.getType(),videoInfo.getVideoPath(),videoInfo.getTitle(),videoInfo.getDescription(),videoInfo.getTags(),videoInfo.getCoverImgPath());
-
-        log.info(ytStatus);
+//        String ytStatus = uploadToYoutubeChannel(videoInfo.getType(),videoInfo.getVideoPath(),videoInfo.getTitle(),videoInfo.getDescription(),videoInfo.getTags(),videoInfo.getCoverImgPath());
+//
+//        log.info(ytStatus);
     }
     public void publishLongVideo(VideoInfo videoInfo){
         uploadToYoutubeChannel(videoInfo.getType(),videoInfo.getVideoPath(),videoInfo.getTitle(),videoInfo.getDescription(),videoInfo.getTags(),videoInfo.getCoverImgPath());

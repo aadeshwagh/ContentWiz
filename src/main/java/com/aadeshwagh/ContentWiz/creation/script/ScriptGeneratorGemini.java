@@ -139,8 +139,9 @@ public class ScriptGeneratorGemini implements ScriptGenerator {
                 .build();
     }
 
+
     @Override
-    public void generateScript(String storyOrPrompt, String scriptPromptPath ,String outputDir) {
+    public void generateScript(String storyOrPrompt, String scriptPromptPath, String outputDir, String name) {
         try {
             Content systemInstruction = Content.fromParts(
                     Part.fromText(loadPromptFromFile(scriptPromptPath))
@@ -162,7 +163,7 @@ public class ScriptGeneratorGemini implements ScriptGenerator {
             Script script = objectMapper.readValue(response.text(), Script.class);
             log.info(response.text());
             objectMapper.writerWithDefaultPrettyPrinter()
-                    .writeValue(new File(outputDir + "/script.json"), script);
+                    .writeValue(new File(outputDir +"/"+ name+"-script.json"), script);
             log.info("Script generation completed — {} scenes", script.getScenes().size());
         } catch (Exception e) {
             throw new RuntimeException(e);

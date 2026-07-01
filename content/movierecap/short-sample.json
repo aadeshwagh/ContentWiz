@@ -1,0 +1,15 @@
+{
+  "description" : "In a future ravaged by war between humanity and advanced AI, a grieving soldier embarks on a desperate mission. He's tasked with destroying a new AI weapon that could end mankind. But when he discovers this ultimate weapon is a child, his world is turned upside down. Join the journey as loyalties shift, secrets unravel, and the true cost of war is revealed. Can this unlikely pair save both humans and AI before total annihilation?",
+  "scenes" : [ {
+    "sceneNo": 1,
+    "clipEndTime" : "00:02:20,250",
+    "clipStartTime" : "00:01:17,208",
+    "narration" : "In the near future, humanity thrives with the help of advanced Artificial Intelligence, known as Simulants. These robots are seamlessly integrated into society, serving every need from household chores to public service. They are designed to be more human than human, creating a seemingly utopian existence."
+  }, {
+    "sceneNo": 2,
+    "clipEndTime" : "00:03:26,167",
+    "clipStartTime" : "00:02:37,833",
+    "narration" : "However, this peace shatters ten years ago when a nuclear warhead detonates in Los Angeles, killing millions. The Western world blames AI, banning and waging war against them. But in New Asia, AI is embraced as equals, leading to a brutal global conflict. The US military vows to hunt down all AI, believing it's a fight for human existence."
+  }
+  ]
+}
