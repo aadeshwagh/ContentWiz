@@ -41,14 +41,18 @@ public class VideoAssemblyService {
     private static final double SHORT_SPEED_FACTOR = 1.25;
 
     // --- Shorts: title (drawn in the top letterbox band) ---
+    // --- Shorts: title (drawn in the top letterbox band) ---
     private static final String TITLE_FONT_FILE = "/System/Library/Fonts/Supplemental/Poppins-SemiBold.ttf";
     private static final int TITLE_FONT_SIZE = 44;
     private static final int TITLE_WRAP_CHARS = 26;
+    private static final int TITLE_LEFT_MARGIN = 60;     // left padding instead of centering
+    private static final int TITLE_BOTTOM_PADDING =104;  // gap between title baseline and the video frame
 
     // --- Shorts: karaoke-style subtitles (drawn in the bottom letterbox band) ---
-    private static final int SUBTITLE_WORDS_PER_GROUP = 3;
+    private static final int SUBTITLE_WORDS_PER_GROUP = 5;
     private static final String SUBTITLE_FONT_FAMILY = "Poppins SemiBold"; // fontconfig family name
-    private static final int SUBTITLE_FONT_SIZE = 44;
+    private static final int SUBTITLE_FONT_SIZE = 58;                     // was 45 — bigger
+    private static final int SUBTITLE_BOTTOM_MARGIN = 60;                 // distance from the very bottom edge of the frame
     private static final String SUBTITLE_HIGHLIGHT_COLOR = "&H0000FFFF&"; // ASS &HAABBGGRR& — yellow, spoken word
     private static final String SUBTITLE_BASE_COLOR = "&H00FFFFFF&";      // white, not-yet-spoken words
 
@@ -243,9 +247,10 @@ public class VideoAssemblyService {
         // regardless of camera movement.
         String titleDraw = String.format(
                 "drawtext=fontfile='%s':textfile='%s':fontsize=%d:fontcolor=white:" +
-                        "x=(w-text_w)/2:y=(%d-text_h)/2:line_spacing=4:" +
+                        "x=%d:y=%d-text_h-%d:line_spacing=4:" +
                         "shadowcolor=black@0.6:shadowx=1:shadowy=1",
-                titleFontPath, titlePath, TITLE_FONT_SIZE, bandHeight
+                titleFontPath, titlePath, TITLE_FONT_SIZE,
+                TITLE_LEFT_MARGIN, bandHeight, TITLE_BOTTOM_PADDING
         );
 
         // Karaoke-style subtitles rendered by libass from the per-scene .ass file.
@@ -351,9 +356,8 @@ public class VideoAssemblyService {
         // NOTE: adjust this getter if narration text lives on a different field/method.
         String narration = scene.getNarration() != null ? scene.getNarration() : "";
         List<WordTiming> timings = computeWordTimings(narration, audioDuration);
-
         int fontSize = SUBTITLE_FONT_SIZE;
-        int marginV = Math.max((bandHeight - (int) (fontSize * 1.3)) / 2, 20);
+        int marginV = Math.max(bandHeight - (int) (fontSize * 1.2) - SUBTITLE_BOTTOM_MARGIN, 10);
 
         StringBuilder ass = new StringBuilder();
         ass.append("[Script Info]\n");

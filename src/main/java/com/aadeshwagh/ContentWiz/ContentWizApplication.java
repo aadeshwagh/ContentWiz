@@ -13,11 +13,12 @@ import com.aadeshwagh.ContentWiz.creation.videoAssembly.RecapVideoAssembly;
 import com.aadeshwagh.ContentWiz.creation.videoAssembly.VideoAssemblyService;
 import com.aadeshwagh.ContentWiz.util.FileServer;
 import com.aadeshwagh.ContentWiz.upload.UploadService;
+import com.fasterxml.jackson.core.type.TypeReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.File;
 import java.util.List;
@@ -65,9 +66,9 @@ public class ContentWizApplication implements CommandLineRunner {
 
 	@Override
 	public void run(String... args) throws Exception {
-		//fileServer.getPublicBaseUrl();
-		//uploadService.publishVideosForType("wakethefuckup");
-		String storyPrompt = "7. \"Your Brain Has a Battery — Here's How to Stop Draining It by Noon\" — energy management framing (more novel than time management). create the big script grater than 8 minutes plus more visuals";
+//		fileServer.getPublicBaseUrl();
+//		uploadService.publishVideosForType("wakethefuckup");
+//		String storyPrompt = "7. \"Your Brain Has a Battery — Here's How to Stop Draining It by Noon\" — energy management framing (more novel than time management). create the big script grater than 8 minutes plus more visuals";
 		//scriptGenerator.generateScript(storyPrompt,"/Users/aadeshwagh/ContentWiz/src/main/java/com/aadeshwagh/ContentWiz/creation/prompts/long-video-script-system-prompt-stick-figure-style.txt","/Users/aadeshwagh/ContentWiz/content/wakethefuckup","brain-batery");
 //		Script script = objectMapper.readValue(new File("/Users/aadeshwagh/ContentWiz/content/wakethefuckup/brain-batery-script.json"),Script.class);
 //		long startTime = System.nanoTime();
@@ -107,7 +108,11 @@ public class ContentWizApplication implements CommandLineRunner {
 //
 //		System.out.printf("Total execution time: %.3f seconds%n", durationSeconds);
 		Script script = objectMapper.readValue(new File("/Users/aadeshwagh/ContentWiz/content/wakethefuckup/brain-batery-script.json"),Script.class);
-		List<Shorts> shorts = scriptGenerator.generateShorts(script);
+		List<Shorts> shorts = objectMapper.readValue(
+				new File("/Users/aadeshwagh/ContentWiz/content/wakethefuckup/brain-short-script.json"),
+				new TypeReference<List<Shorts>>() {}
+		);
+		//List<Shorts> shorts = objectMapper.readValue(new File("/Users/aadeshwagh/ContentWiz/content/wakethefuckup/brain-short-script.json"),TypeReference<List<Shorts>>(){});
 		videoAssemblyService.assembleShortVideos(script,shorts,"/Users/aadeshwagh/ContentWiz/content/wakethefuckup/workdir","/Users/aadeshwagh/ContentWiz/content/wakethefuckup/short");
 		metaDataService.addMetaDataForShortScript(shorts,"wakethefuckup");
 

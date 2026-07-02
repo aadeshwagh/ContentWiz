@@ -1,0 +1,38 @@
+[
+  {
+    "startScene": 1,
+    "endScene": 5,
+    "title": "Why Your Brain Runs Out of Power by Noon",
+    "description": "Feeling drained before lunch? Discover why your brain's energy is finite and how modern life drains it. It's not laziness, it's energy management!"
+  },
+  {
+    "startScene": 6,
+    "endScene": 10,
+    "title": "The Hidden Brain Drains You Didn't Know About",
+    "description": "Digital overload, rapid task switching, and decision fatigue are silently draining your mental energy. Learn how these everyday habits exhaust your brain."
+  },
+  {
+    "startScene": 15,
+    "endScene": 20,
+    "title": "Boost Focus: The Power of Micro-Recharges",
+    "description": "Learn about your brain's natural energy rhythms and how short, genuine breaks can reset your focus and boost productivity. Stop just switching tabs!"
+  },
+  {
+    "startScene": 24,
+    "endScene": 28,
+    "title": "Brain Fuel: Eat, Drink, Sleep for Max Energy",
+    "description": "Discover how proper nutrition, hydration, and quality sleep are essential for maintaining your brain's energy levels throughout the day. Fuel your focus!"
+  },
+  {
+    "startScene": 29,
+    "endScene": 33,
+    "title": "Quick Energy Hacks for Your Brain",
+    "description": "Feeling sluggish? Learn about the instant brain-boosting power of naps, movement, and mindful disconnection to recharge on the go. Stay sharp!"
+  },
+  {
+    "startScene": 34,
+    "endScene": 38,
+    "title": "Stop Brain Drain: Simple Steps for Lasting Energy",
+    "description": "Ready to feel focused all day? Learn simple, actionable strategies to manage your brain's energy and reclaim your productivity and vitality. It starts now!"
+  }
+]
