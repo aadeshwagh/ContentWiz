@@ -12,6 +12,7 @@ import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -35,6 +36,21 @@ public class VideoAssemblyService {
     private static final int SHORT_W = 1080;
     private static final int SHORT_H = 1920;
     private static final int BACKDROP_BLUR_SIGMA = 20;
+
+    // --- Shorts: speed-up ---
+    private static final double SHORT_SPEED_FACTOR = 1.25;
+
+    // --- Shorts: title (drawn in the top letterbox band) ---
+    private static final String TITLE_FONT_FILE = "/System/Library/Fonts/Supplemental/Poppins-SemiBold.ttf";
+    private static final int TITLE_FONT_SIZE = 44;
+    private static final int TITLE_WRAP_CHARS = 26;
+
+    // --- Shorts: karaoke-style subtitles (drawn in the bottom letterbox band) ---
+    private static final int SUBTITLE_WORDS_PER_GROUP = 3;
+    private static final String SUBTITLE_FONT_FAMILY = "Poppins SemiBold"; // fontconfig family name
+    private static final int SUBTITLE_FONT_SIZE = 44;
+    private static final String SUBTITLE_HIGHLIGHT_COLOR = "&H0000FFFF&"; // ASS &HAABBGGRR& — yellow, spoken word
+    private static final String SUBTITLE_BASE_COLOR = "&H00FFFFFF&";      // white, not-yet-spoken words
 
 
     private double pauseFor(double audioDuration, boolean isLast) {
@@ -86,6 +102,7 @@ public class VideoAssemblyService {
         }
         return outputs;
     }
+
     private Path assembleSingleShort(com.aadeshwagh.ContentWiz.creation.entity.Shorts shortDef,
                                      Map<Integer, Scene> sceneByNumber,
                                      String workingDir, String outputDir)
@@ -114,22 +131,34 @@ public class VideoAssemblyService {
         double[] pauseDurations = derivePauseDurations(scenes, audioDurations);
         double[] transitionDurations = deriveTransitionDurations(scenes, audioDurations, pauseDurations);
 
+        // Figure out the letterbox band size from the actual source image aspect ratio
+        int[] baseDims = probeImageDimensions(scenes.get(0), workingDir);
+        int bandHeight = computeLetterboxBandHeight(baseDims[0], baseDims[1]);
+
+        String sanitized = sanitizeTitle(shortDef.getTitle());
+        Path titleFile = writeTextFile(wrapText(shortDef.getTitle(), TITLE_WRAP_CHARS),
+                workingDir, "short_title_" + sanitized + ".txt");
+
         log.info("Assembling short \"{}\" — scenes {}-{}, {} scene(s)",
                 shortDef.getTitle(), shortDef.getStartScene(), shortDef.getEndScene(), scenes.size());
 
-        Path outputPath = Paths.get(outputDir, sanitizeTitle(shortDef.getTitle()) + ".mp4");
+        Path outputPath = Paths.get(outputDir, sanitized + ".mp4");
 
         List<String> command = buildShortFfmpegCommand(
-                scenes, audioDurations, transitionDurations, pauseDurations, workingDir, outputPath.toString());
+                scenes, audioDurations, transitionDurations, pauseDurations,
+                titleFile, bandHeight, workingDir, sanitized, outputPath.toString());
 
         runProcess(command, workingDir);
 
         log.info("Short assembled: {}", outputPath);
         return outputPath;
     }
+
     private List<String> buildShortFfmpegCommand(List<Scene> scenes, double[] audioDurations,
                                                  double[] transitionDurations, double[] pauseDurations,
-                                                 String workingDir, String outputPath) {
+                                                 Path titleFile, int bandHeight,
+                                                 String workingDir, String shortSanitizedName,
+                                                 String outputPath) throws IOException {
         List<String> cmd = new ArrayList<>();
         cmd.add("ffmpeg");
         cmd.add("-y");
@@ -145,8 +174,9 @@ public class VideoAssemblyService {
         }
 
         cmd.addAll(List.of("-filter_complex",
-                buildShortFilterComplex(scenes, audioDurations, transitionDurations, pauseDurations)));
-        cmd.addAll(List.of("-map", "[vout]", "-map", "[aout]"));
+                buildShortFilterComplex(scenes, audioDurations, transitionDurations, pauseDurations,
+                        titleFile, bandHeight, workingDir, shortSanitizedName)));
+        cmd.addAll(List.of("-map", "[vfinal]", "-map", "[afinal]"));
         cmd.addAll(List.of(
                 "-c:v", VIDEO_CODEC,
                 "-preset", "medium",
@@ -162,7 +192,9 @@ public class VideoAssemblyService {
     }
 
     private String buildShortFilterComplex(List<Scene> scenes, double[] audioDurations,
-                                           double[] transitionDurations, double[] pauseDurations) {
+                                           double[] transitionDurations, double[] pauseDurations,
+                                           Path titleFile, int bandHeight,
+                                           String workingDir, String shortSanitizedName) throws IOException {
         StringBuilder fc = new StringBuilder();
         int count = scenes.size();
 
@@ -172,7 +204,11 @@ public class VideoAssemblyService {
             int audioInput = i * 2 + 1;
             double leadIn = (i > 0) ? transitionDurations[i - 1] : 0.0;
 
-            fc.append(buildShortCameraFilter(videoInput, i, scene, audioDurations[i], pauseDurations[i], leadIn));
+            Path assFile = buildAssSubtitleFile(scene, audioDurations[i], leadIn,
+                    workingDir, shortSanitizedName, bandHeight);
+
+            fc.append(buildShortCameraFilter(videoInput, i, scene, audioDurations[i], pauseDurations[i], leadIn,
+                    titleFile, assFile, bandHeight));
             fc.append(String.format(
                     "[%d:a]atrim=0:%.3f,asetpts=PTS-STARTPTS,apad=whole_dur=%.3f[a%d];%n",
                     audioInput, audioDurations[i], audioDurations[i] + pauseDurations[i], i
@@ -182,11 +218,16 @@ public class VideoAssemblyService {
         fc.append(buildXfadeChain(scenes, audioDurations, transitionDurations, pauseDurations));
         fc.append(buildAudioConcat(count));
 
+        // Speed up the fully assembled short by SHORT_SPEED_FACTOR
+        fc.append(String.format("[vout]setpts=PTS/%.3f[vfinal];%n", SHORT_SPEED_FACTOR));
+        fc.append(String.format("[aout]atempo=%.3f[afinal];%n", SHORT_SPEED_FACTOR));
+
         return fc.toString();
     }
 
     private String buildShortCameraFilter(int inputIndex, int sceneIndex, Scene scene,
-                                          double audioDuration, double pauseDuration, double leadIn) {
+                                          double audioDuration, double pauseDuration, double leadIn,
+                                          Path titleFile, Path subtitleAssFile, int bandHeight) {
         int motionFrames = (int) Math.ceil(audioDuration * FPS);
         int totalFrames  = (int) Math.ceil((leadIn + audioDuration + pauseDuration) * FPS);
 
@@ -194,21 +235,181 @@ public class VideoAssemblyService {
         String xExpr    = buildXExpression(scene.getCameraMovement(), motionFrames);
         String yExpr    = buildYExpression(scene.getCameraMovement(), motionFrames);
 
+        String titleFontPath = escapeDrawtextPath(TITLE_FONT_FILE);
+        String titlePath     = escapeDrawtextPath(titleFile.toString());
+        String assPath       = escapeDrawtextPath(subtitleAssFile.toString());
+
+        // Title fixed in the top letterbox band. Drawn AFTER zoompan/trim so it stays put
+        // regardless of camera movement.
+        String titleDraw = String.format(
+                "drawtext=fontfile='%s':textfile='%s':fontsize=%d:fontcolor=white:" +
+                        "x=(w-text_w)/2:y=(%d-text_h)/2:line_spacing=4:" +
+                        "shadowcolor=black@0.6:shadowx=1:shadowy=1",
+                titleFontPath, titlePath, TITLE_FONT_SIZE, bandHeight
+        );
+
+        // Karaoke-style subtitles rendered by libass from the per-scene .ass file.
+        String subtitleAss = String.format("ass=filename='%s'", assPath);
+
         return String.format(
                 "[%d:v]" +
                         "scale=%d:%d:force_original_aspect_ratio=decrease," +
                         "pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black," +
                         "scale=iw*2:ih*2," +
                         "zoompan=z='%s':x='%s':y='%s':d=%d:s=%dx%d:fps=%d," +
-                        "trim=0:%.3f,setpts=PTS-STARTPTS" +
+                        "trim=0:%.3f,setpts=PTS-STARTPTS," +
+                        "%s,%s" +
                         "[v%d];%n",
                 inputIndex,
                 SHORT_W, SHORT_H,
                 SHORT_W, SHORT_H,
                 zoomExpr, xExpr, yExpr, totalFrames, SHORT_W, SHORT_H, FPS,
                 leadIn + audioDuration + pauseDuration,
+                subtitleAss, titleDraw,
                 sceneIndex
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // Shorts helpers: letterbox band sizing, title text, karaoke subtitles
+    // -------------------------------------------------------------------------
+
+    /**
+     * Computes the height of the black band that will appear above (and below) the
+     * scaled image once it's fit into the SHORT_W x SHORT_H portrait canvas while
+     * preserving aspect ratio (mirrors what scale=force_original_aspect_ratio=decrease does).
+     */
+    private int computeLetterboxBandHeight(int imgW, int imgH) {
+        double scale = Math.min((double) SHORT_W / imgW, (double) SHORT_H / imgH);
+        int scaledH = (int) Math.round(imgH * scale);
+        return Math.max((SHORT_H - scaledH) / 2, 0);
+    }
+
+    private Path writeTextFile(String content, String workingDir, String filename) throws IOException {
+        Path path = Paths.get(workingDir, filename);
+        Files.writeString(path, content, StandardCharsets.UTF_8);
+        return path;
+    }
+
+    /** Simple greedy word-wrap so drawtext (which doesn't auto-wrap) gets sane line breaks. */
+    private String wrapText(String text, int maxCharsPerLine) {
+        if (text == null || text.isBlank()) return "";
+        String[] words = text.trim().split("\\s+");
+        StringBuilder result = new StringBuilder();
+        StringBuilder line = new StringBuilder();
+        for (String word : words) {
+            if (line.length() > 0 && line.length() + word.length() + 1 > maxCharsPerLine) {
+                result.append(line).append("\n");
+                line.setLength(0);
+            }
+            if (line.length() > 0) line.append(" ");
+            line.append(word);
+        }
+        if (line.length() > 0) result.append(line);
+        return result.toString();
+    }
+
+    /** Escapes a filesystem path for safe use as a drawtext filter option value. */
+    private String escapeDrawtextPath(String path) {
+        return path.replace("\\", "\\\\").replace(":", "\\:");
+    }
+
+    private record WordTiming(String word, double startSec, double durationSec) {}
+
+    /**
+     * Estimates per-word timing across the scene's narration audio, proportional to word
+     * length (longer words get slightly more time; a small constant is added per word to
+     * approximate the natural gap between words). This is an approximation — if Chatterbox
+     * TTS ever exposes real word-level timestamps, swap this out for those instead.
+     */
+    private List<WordTiming> computeWordTimings(String narration, double audioDuration) {
+        if (narration == null || narration.isBlank() || audioDuration <= 0) return List.of();
+        String[] words = narration.trim().split("\\s+");
+        double[] weights = new double[words.length];
+        double totalWeight = 0;
+        for (int i = 0; i < words.length; i++) {
+            weights[i] = Math.max(words[i].length(), 1) + 1.0; // +1 approximates the gap after each word
+            totalWeight += weights[i];
+        }
+        List<WordTiming> timings = new ArrayList<>();
+        double cursor = 0;
+        for (int i = 0; i < words.length; i++) {
+            double dur = audioDuration * (weights[i] / totalWeight);
+            timings.add(new WordTiming(words[i], cursor, dur));
+            cursor += dur;
+        }
+        return timings;
+    }
+
+    /**
+     * Builds a per-scene .ass subtitle file that shows SUBTITLE_WORDS_PER_GROUP words at a
+     * time, with each word highlighted via ASS karaoke (\k) tags as it's "spoken".
+     */
+    private Path buildAssSubtitleFile(Scene scene, double audioDuration, double leadIn,
+                                      String workingDir, String shortSanitizedName,
+                                      int bandHeight) throws IOException {
+        // NOTE: adjust this getter if narration text lives on a different field/method.
+        String narration = scene.getNarration() != null ? scene.getNarration() : "";
+        List<WordTiming> timings = computeWordTimings(narration, audioDuration);
+
+        int fontSize = SUBTITLE_FONT_SIZE;
+        int marginV = Math.max((bandHeight - (int) (fontSize * 1.3)) / 2, 20);
+
+        StringBuilder ass = new StringBuilder();
+        ass.append("[Script Info]\n");
+        ass.append("ScriptType: v4.00+\n");
+        ass.append("PlayResX: ").append(SHORT_W).append("\n");
+        ass.append("PlayResY: ").append(SHORT_H).append("\n");
+        ass.append("WrapStyle: 2\n\n");
+        ass.append("[V4+ Styles]\n");
+        ass.append("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n");
+        ass.append(String.format(
+                "Style: Caption,%s,%d,%s,%s,&H00000000&,&H00000000&,1,0,0,0,100,100,0,0,1,3,0,2,60,60,%d,1%n",
+                SUBTITLE_FONT_FAMILY, fontSize, SUBTITLE_HIGHLIGHT_COLOR, SUBTITLE_BASE_COLOR, marginV
+        ));
+        ass.append("\n[Events]\n");
+        ass.append("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n");
+
+        for (int i = 0; i < timings.size(); i += SUBTITLE_WORDS_PER_GROUP) {
+            List<WordTiming> group = timings.subList(i, Math.min(i + SUBTITLE_WORDS_PER_GROUP, timings.size()));
+            double groupStart = leadIn + group.get(0).startSec();
+            double groupEnd   = leadIn + group.get(group.size() - 1).startSec() + group.get(group.size() - 1).durationSec();
+
+            StringBuilder text = new StringBuilder();
+            for (WordTiming wt : group) {
+                int centiseconds = (int) Math.round(wt.durationSec() * 100);
+                text.append("{\\k").append(Math.max(centiseconds, 1)).append("}").append(wt.word()).append(" ");
+            }
+
+            ass.append(String.format("Dialogue: 0,%s,%s,Caption,,0,0,0,,%s%n",
+                    formatAssTime(groupStart), formatAssTime(groupEnd), text.toString().trim()));
+        }
+
+        Path path = Paths.get(workingDir, "sub_" + shortSanitizedName + "_" + scene.getSceneNumber() + ".ass");
+        Files.writeString(path, ass.toString(), StandardCharsets.UTF_8);
+        return path;
+    }
+
+    private String formatAssTime(double seconds) {
+        if (seconds < 0) seconds = 0;
+        int hours = (int) (seconds / 3600);
+        int minutes = (int) ((seconds % 3600) / 60);
+        double secsRemainder = seconds % 60;
+        int secs = (int) secsRemainder;
+        int centis = (int) Math.round((secsRemainder - secs) * 100);
+        if (centis == 100) {
+            centis = 0;
+            secs += 1;
+            if (secs == 60) {
+                secs = 0;
+                minutes += 1;
+                if (minutes == 60) {
+                    minutes = 0;
+                    hours += 1;
+                }
+            }
+        }
+        return String.format("%d:%02d:%02d.%02d", hours, minutes, secs, centis);
     }
 
     public Path assembleVideo(Script script, String workingDir, String outputDir)
@@ -498,7 +699,7 @@ public class VideoAssemblyService {
     private String buildAudioConcat(int sceneCount) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < sceneCount; i++) sb.append("[a").append(i).append("]");
-        sb.append(String.format("concat=n=%d:v=0:a=1[aout]%n", sceneCount));
+        sb.append(String.format("concat=n=%d:v=0:a=1[aout];%n", sceneCount));
         return sb.toString();
     }
 
@@ -581,4 +782,3 @@ public class VideoAssemblyService {
         return title.replaceAll("[^a-zA-Z0-9_\\-]", "_").toLowerCase();
     }
 }
-

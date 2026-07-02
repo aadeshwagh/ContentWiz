@@ -11,4 +11,5 @@ public class MovieRecapScript {
     String title;
     String description;
     List<MovieRecapScene> scenes;
+    private List<MovieRecapShort> shorts;
 }
