@@ -1,58 +1,60 @@
-ContentWiz
+# ContentWiz
 
-Phase 1
+> An automated, AI-driven pipeline that turns a topic into a finished video — script, visuals, and voiceover — then publishes it to YouTube and Instagram.
 
-current requirements
-feature/upload
+ContentWiz is a Spring Boot application that automates short- and long-form video content end to end. It generates the script, the visuals, and the narration with AI, assembles them into a finished video, and uploads it to the right channels — so an entire content workflow runs with minimal hands-on work.
 
-1. System should be able to pick from type given in properties files then long/short videos and upload them to the channel mentioned for that type
-    for eg. type motivation is there. There will be folder named motivation inside that two folders long and short then there will be property named channel name 
-    for channels of motivation type one for instagram and one for youtube then all the videos in short folder under perticular type will get uploaded to the instagram and youtube both
-    and videos in long will only get uploaded to youtube now each folder long and short will have a file json/text which ever is easy that will contain all the information of the videos in that folder for youtube and instagram which is needed to upload
-    like title what video path in the same folder, hashtags and description thumbnail path ( this too will be in same folder ) and other stuff . all the passwords and account names will be in properties file 
+## How it works
 
-2. lets first focus on what content work and what channel
-    1. fist focus on youtube channel and its content
-   
-3. Lets create the 2 youtube channels 
-   1. The niche channel - finance and other niche stuff
-   2. the lore channel - stories, recaps and stuff
-   3. then create shots and reels corresponding to that
+The pipeline runs in stages:
 
-now for creating a channel what is required
-1. The video / art style
-2. The script
-3. the voice over
-4. the baground music
+1. **Script** — generates a style-specific script with Google Gemini (Flash).
+2. **Visuals** — generates art-style-specific images, plus a thumbnail derived from the description, with Gemini's image model.
+3. **Voiceover** — produces narration with Chatterbox TTS, run locally via ONNX Runtime.
+4. **Assembly** — combines the generated images and audio into a finished video.
+5. **Publish** — uploads by content *type*: shorts go to both YouTube and Instagram, long-form goes to YouTube. Titles, hashtags, descriptions, and thumbnails are read from per-folder metadata files.
 
-script is done - gemini flash
-lets see how can i make it better with other models and specialised inputs - done made it style specific
-also modify the system prompt to add description field and other if necessary and make - done
-the image generation prompt more specific to decided model and art style - done
+## Content model
 
-tts is done - chatterbox
-i am satisfied with the quality now search for what type of audio i want also see if 
-1. making the emotion constant sounds better or variable is fine
-2. if breaking audio in chunks and then sticking sounds better or a continuous flow
-3. make the script duration field adjusted to actual audio length
+- Content is organized by **type** (e.g. `motivation`, `finance`), each containing `long/` and `short/` folders.
+- Each folder carries a metadata file (title, video path, hashtags, description, thumbnail) used at upload time.
+- Channel names, account handles, and credentials live in the properties file.
 
-image generation
-its done but needed to use the gemini paid api added 1k in tokens lets see how many videos can be made with that
-1. see how can you move the static images, or add some sort of revelent gifs on it or so
-2. generate a thumbnail based on the description
+Planned channels: a **niche** channel (finance and other niches) and a **lore** channel (stories and recaps), with matching shorts and reels.
 
-creating video our of static images and audio files
+## Tech stack
 
+- **Java 21** · **Spring Boot 4**
+- **Google Gen AI SDK (Gemini)** — script and image generation
+- **Chatterbox TTS** via **ONNX Runtime** — voiceover
+- **java-ngrok** — tunneling for upload/auth callbacks
+- **Lombok** · **Maven**
 
+## Getting started
 
-lets fix the video assembly first - done
+### Prerequisites
+- Java 21+
+- Maven
+- A Google Gemini API key (image generation uses the paid Gemini API)
 
-fix the tags from script what are supported what not and test it  - done
+### Configure
+Add your Gemini API key and your channel/account credentials to `src/main/resources/application.properties`.
 
-then the chose the right voice for the channel
+### Build & run
 
-create the final video
+```bash
+git clone https://github.com/aadeshwagh/ContentWiz.git
+cd ContentWiz
+mvn spring-boot:run
+```
 
-gaps in TTS - model dosent seem to understand capital words to emphisise them 
+Or build a runnable jar:
 
-remove the mood section completely
+```bash
+mvn clean package
+java -jar target/ContentWiz-0.0.1-SNAPSHOT.jar
+```
+
+## Status
+
+Actively in development. The generation pipeline — script, image, TTS, and video assembly — is working; multi-platform upload is in progress.
